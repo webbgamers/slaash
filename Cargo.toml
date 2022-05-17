@@ -1,0 +1,22 @@
+[package]
+name = "slaash"
+version = "0.1.0"
+authors = ["Garrett Webb <webbgamers@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[dependencies.serenity]
+version = "0.11"
+default-features = false
+features = ["cache", "builder", "client", "gateway", "http", "model", "utils", "rustls_backend"]
+
+
+[dependencies.tokio]
+version = "1.18"
+features = ["macros", "rt-multi-thread", "signal"]
