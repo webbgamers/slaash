@@ -17,6 +17,6 @@ pub async fn ping(ctx: Context, command: ApplicationCommandInteraction) -> Resul
     })
     .await?;
     
-    info!("Ping from {}.", command.member.unwrap().display_name());
+    info!("Ping from {}", command.member.unwrap().display_name());
     Ok(())
 }
