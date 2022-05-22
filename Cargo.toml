@@ -20,3 +20,7 @@ features = ["cache", "builder", "client", "gateway", "http", "model", "utils", "
 [dependencies.tokio]
 version = "1.18"
 features = ["macros", "rt-multi-thread", "signal"]
+
+[dependencies.rand]
+version = "0.8"
+featrues = ["alloc"]
