@@ -1,5 +1,5 @@
-use serenity::prelude::*;
 use serenity::model::interactions::application_command::ApplicationCommandInteraction;
+use serenity::prelude::*;
 
 use crate::Error;
 

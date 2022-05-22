@@ -6,21 +6,21 @@ use std::sync::Arc;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::model::gateway::Ready;
+use serenity::model::id::GuildId;
 use serenity::model::interactions::{
-    Interaction,
     application_command::ApplicationCommandInteraction,
     application_command::ApplicationCommandOptionType,
     //message_component::MessageComponentInteraction,
+    Interaction,
 };
-use serenity::model::id::GuildId;
-use serenity::Client;
 use serenity::prelude::*;
+use serenity::Client;
 
 use tracing::{error, info};
 
-use crate::commands::ping::*;
-use crate::commands::minesweeper::*;
 use crate::commands::error::*;
+use crate::commands::minesweeper::*;
+use crate::commands::ping::*;
 
 pub struct ShardManagerContainer;
 
@@ -51,7 +51,7 @@ impl EventHandler for Handler {
                 if let Err(err) = result {
                     error!("Command '{}' failed: {}", command_name, err);
                 }
-            },
+            }
             Interaction::MessageComponent(component) => {
                 let component_id = component.data.custom_id.clone();
                 let component_name = component_id.split('-').next().unwrap();
@@ -64,7 +64,7 @@ impl EventHandler for Handler {
                 if let Err(err) = result {
                     error!("Component '{}' failed: {}", component_id, err);
                 }
-            },
+            }
             _ => error!("Unexpected interaction type"),
         }
     }
@@ -80,28 +80,38 @@ impl EventHandler for Handler {
                     command.name("ping").description("Pong hopefully.")
                 })
                 .create_application_command(|command| {
-                    command.name("minesweeper").description("Play a game of minesweeper!")
-                    .create_option(|option| {
-                        option
-                            .name("mines").description("Number of mines.")
-                            .kind(ApplicationCommandOptionType::Integer)
-                            .min_int_value(1).max_int_value(23)
-                    })
+                    command
+                        .name("minesweeper")
+                        .description("Play a game of minesweeper!")
+                        .create_option(|option| {
+                            option
+                                .name("mines")
+                                .description("Number of mines.")
+                                .kind(ApplicationCommandOptionType::Integer)
+                                .min_int_value(1)
+                                .max_int_value(23)
+                        })
                 })
                 .create_application_command(|command| {
                     command.name("error").description("Test error.")
                 })
-            })
-            .await
-            .unwrap();
+        })
+        .await
+        .unwrap();
 
-            info!("Registered commands: {:?}", new_commands.into_iter().map(|c| c.name ).collect::<Vec<_>>());
-        }
-    }  
-
+        info!(
+            "Registered commands: {:?}",
+            new_commands.into_iter().map(|c| c.name).collect::<Vec<_>>()
+        );
+    }
+}
 
 async fn bad(ctx: Context, command: ApplicationCommandInteraction) -> Result<(), Error> {
-    command.member.unwrap().kick_with_reason(&ctx.http, "Test (hopefully doesnt ban)").await?;
+    command
+        .member
+        .unwrap()
+        .kick_with_reason(&ctx.http, "Test (hopefully doesnt ban)")
+        .await?;
     Ok(())
 }
 
@@ -121,7 +131,7 @@ async fn main() {
         .event_handler(Handler)
         .await
         .expect("Error creating client");
-    
+
     // Setup persistent data stores
     {
         let mut data = client.data.write().await;
@@ -133,11 +143,13 @@ async fn main() {
 
     // Ctrl+C Handler
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("Error registering Ctrl+C handler");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Error registering Ctrl+C handler");
         info!("Recieved Ctrl+C, shutting down");
         shard_manager.lock().await.shutdown_all().await;
     });
-        
+
     // Start client
     if let Err(err) = client.start().await {
         error!("Client error: {:?}", err);
