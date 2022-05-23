@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::iter::repeat_with;
 use std::time::Instant;
 
 use rand::seq::SliceRandom;
@@ -18,59 +19,66 @@ use tracing::{info, warn};
 
 use crate::Error;
 
-#[derive(Debug, Clone)]
 pub enum MinesweeperCell {
     Safe,
     Checked,
     Bomb,
 }
 
-#[derive(Debug)]
 pub struct MinesweeperGame {
     player: UserId,
-    start_time: Instant,
-    board: Vec<MinesweeperCell>,
+    mines: usize,
+    start_time: Option<Instant>,
+    board: Option<Vec<MinesweeperCell>>,
 }
 
-#[derive(Debug)]
+impl MinesweeperGame {
+    fn new(player: UserId, mines: usize) -> MinesweeperGame {
+        MinesweeperGame {
+            player,
+            mines,
+            start_time: None,
+            board: None,
+        }
+    }
+
+    fn start_game(&mut self, safe_cell_index: usize) {
+        let rng = &mut rand::thread_rng();
+        let mut board = repeat_with(|| MinesweeperCell::Safe)
+            .take(25)
+            .collect::<Vec<_>>();
+        let bombs = (0..safe_cell_index)
+            .chain((safe_cell_index + 1)..25)
+            .collect::<Vec<_>>();
+        let bombs = bombs.choose_multiple(rng, self.mines).cloned();
+        for b in bombs {
+            board[b] = MinesweeperCell::Bomb;
+        }
+        self.start_time = Some(Instant::now());
+        self.board = Some(board);
+    }
+}
+
 pub struct MinesweeperGames;
 
 impl TypeMapKey for MinesweeperGames {
     type Value = HashMap<String, MinesweeperGame>;
 }
 
-fn create_game(mines: usize, player: UserId) -> MinesweeperGame {
-    let mut rng = &mut rand::thread_rng();
-    let mut board = vec![MinesweeperCell::Safe; 25];
-    let bombs = 0..25_usize;
-    let bombs = bombs.collect::<Vec<_>>();
-    let bombs = bombs.choose_multiple(rng, mines).cloned();
-    for b in bombs {
-        board[b] = MinesweeperCell::Bomb;
-    }
-
-    MinesweeperGame {
-        player,
-        start_time: Instant::now(),
-        board,
-    }
-}
-
-fn render_board<'a, 'b>(
+fn render_board(
     game: &MinesweeperGame,
-    response_data: &'b mut CreateInteractionResponseData<'a>,
     id: String,
-    selected_cell_index: Option<usize>,
+    selected_cells: &Option<Vec<usize>>,
     game_over: bool,
-) -> &'b mut CreateInteractionResponseData<'a> {
-    let board = &game.board;
-    let size = 5;
-    response_data.components(|components| {
-        for y in 0..size {
+) -> CreateComponents {
+    let mut components = CreateComponents::default();
+
+    if let Some(board) = &game.board {
+        for y in 0..5 {
             components.create_action_row(|row| {
-                for x in 0..size {
+                for x in 0..5 {
                     row.create_button(|button| {
-                        let index = y * size + x;
+                        let index = y * 5 + x;
                         let cell = &board[index];
                         let (emoji, cell_style, disabled) = match cell {
                             MinesweeperCell::Bomb => (
@@ -104,8 +112,8 @@ fn render_board<'a, 'b>(
                             style = cell_style;
                         }
 
-                        if let Some(cell) = selected_cell_index {
-                            if index == cell {
+                        if let Some(cells) = selected_cells {
+                            if let Some(_) = cells.iter().find(|&&c| c == index) {
                                 style = cell_style;
                             }
                         };
@@ -120,58 +128,24 @@ fn render_board<'a, 'b>(
                 row
             });
         }
-
-        components
-    });
-
-    if game_over {
-        let safes = board
-            .iter()
-            .filter(|&c| {
-                if let MinesweeperCell::Safe = c {
-                    true
-                } else {
-                    false
+    } else {
+        for y in 0..5 {
+            components.create_action_row(|row| {
+                for x in 0..5 {
+                    row.create_button(|button| {
+                        let index = y * 5 + x;
+                        button
+                            .custom_id(format!("minesweeper-{}-{}", id, index))
+                            .style(ButtonStyle::Secondary)
+                            .emoji(ReactionType::Unicode(String::from("\u{1F7E6}")))
+                    });
                 }
-            })
-            .count();
-        let bombs = board
-            .iter()
-            .filter(|&c| {
-                if let MinesweeperCell::Bomb = c {
-                    true
-                } else {
-                    false
-                }
-            })
-            .count();
-
-        if safes == 0 {
-            response_data.content(format!(
-                "**You win!**\nBombs: {}\nTime: {}s",
-                bombs,
-                game.start_time.elapsed().as_secs()
-            ));
-        } else {
-            let checked = board
-                .iter()
-                .filter(|&c| {
-                    if let MinesweeperCell::Checked = c {
-                        true
-                    } else {
-                        false
-                    }
-                })
-                .count();
-            response_data.content(format!(
-                "**Game over.**\nBombs: {}\nCells cleared: {}\nTime: {}s",
-                bombs,
-                checked,
-                game.start_time.elapsed().as_secs()
-            ));
+                row
+            });
         }
     }
-    response_data
+
+    components
 }
 
 fn number_to_emoji(number: usize) -> String {
@@ -190,31 +164,50 @@ fn number_to_emoji(number: usize) -> String {
     String::from(str)
 }
 
-fn count_adjacent_bombs(board: &Vec<MinesweeperCell>, index: usize) -> usize {
-    let size = 5;
-    let mut count = 0;
-    let iy = index / size;
-    let ix = index % size;
+fn get_adjacent_cells(board: &Vec<MinesweeperCell>, index: usize) -> Vec<usize> {
+    let mut cells = Vec::new();
+
+    let iy = index / 5;
+    let ix = index % 5;
 
     for y in iy as isize - 1..iy as isize + 2 {
-        if y < 0 || y > size as isize - 1 {
+        if y < 0 || y > 5 as isize - 1 {
             continue;
         }
         for x in ix as isize - 1..ix as isize + 2 {
-            if x < 0 || x > size as isize - 1 {
+            if x < 0 || x > 5 as isize - 1 {
                 continue;
             }
             if x == ix as isize && y == iy as isize {
                 continue;
             }
 
-            if let MinesweeperCell::Bomb = board[y as usize * size + x as usize] {
-                count += 1;
-            }
+            cells.push(y as usize * 5 + x as usize);
         }
     }
 
-    count
+    cells
+}
+
+fn count_adjacent_bombs(board: &Vec<MinesweeperCell>, index: usize) -> usize {
+    get_adjacent_cells(board, index)
+        .iter()
+        .filter(|&&c| matches!(board[c], MinesweeperCell::Bomb))
+        .count()
+}
+
+fn zero_fill(board: &Vec<MinesweeperCell>, mut set: HashSet<usize>) -> HashSet<usize> {
+    let prev = set.clone();
+    for s in prev.iter() {
+        if count_adjacent_bombs(board, *s) == 0 {
+            set.extend(get_adjacent_cells(board, *s).iter());
+        }
+    }
+    if prev == set {
+        return set;
+    }
+
+    zero_fill(board, set)
 }
 
 pub async fn minesweeper(
@@ -223,7 +216,7 @@ pub async fn minesweeper(
 ) -> Result<(), Error> {
     let mut bombs = 3;
     if let Some(option) = command.data.options.get(0) {
-        if let Some(value) = option.resolved.as_ref() {
+        if let Some(value) = &option.resolved {
             if let ApplicationCommandInteractionDataOptionValue::Integer(count) = value {
                 bombs = *count as usize;
             }
@@ -231,20 +224,22 @@ pub async fn minesweeper(
     }
     let mut game_data = ctx.data.write().await;
     let game_list = game_data.get_mut::<MinesweeperGames>().unwrap();
-    game_list.insert(command.id.to_string(), create_game(bombs, command.user.id));
+    game_list.insert(
+        command.id.to_string(),
+        MinesweeperGame::new(command.user.id, bombs),
+    );
 
     command
         .create_interaction_response(&ctx.http, |response| {
             response
                 .kind(InteractionResponseType::ChannelMessageWithSource)
                 .interaction_response_data(|response_data| {
-                    render_board(
+                    response_data.set_components(render_board(
                         &game_list.get(&command.id.to_string()).unwrap(),
-                        response_data,
                         command.id.to_string(),
-                        None,
+                        &None,
                         false,
-                    )
+                    ))
                 })
         })
         .await?;
@@ -271,26 +266,37 @@ pub async fn minesweeper_button(
     match game_list.get_mut(game_id) {
         Some(game) => {
             if component.user.id == game.player {
-                let board = &mut game.board;
-                let selected_cell = &board[index];
-                let mut game_over = false;
+                if let None = game.board {
+                    game.start_game(index);
+                }
 
-                match selected_cell {
-                    MinesweeperCell::Bomb => game_over = true,
-                    MinesweeperCell::Safe => {
-                        board[index] = MinesweeperCell::Checked;
-                        if let None = board.iter().find(|&c| {
-                            if let MinesweeperCell::Safe = c {
-                                true
-                            } else {
-                                false
+                let mut game_over = false;
+                let mut selected_cells = vec![index];
+
+                {
+                    let board = &mut game.board.as_mut().unwrap();
+
+                    let selected_cell = &board[index];
+
+                    match selected_cell {
+                        MinesweeperCell::Bomb => game_over = true,
+                        MinesweeperCell::Safe => {
+                            let mut set = HashSet::new();
+                            set.insert(index);
+                            let fill = zero_fill(board, set);
+                            for f in &fill {
+                                board[*f] = MinesweeperCell::Checked;
                             }
-                        }) {
-                            game_over = true;
+                            selected_cells = fill.into_iter().collect::<Vec<_>>();
+
+                            if let None = board.iter().find(|&c| matches!(c, MinesweeperCell::Safe))
+                            {
+                                game_over = true;
+                            }
                         }
-                    }
-                    MinesweeperCell::Checked => {
-                        warn!("Checked cell selected which should be disabled.");
+                        MinesweeperCell::Checked => {
+                            warn!("Checked cell selected which should be disabled.");
+                        }
                     }
                 }
 
@@ -299,13 +305,39 @@ pub async fn minesweeper_button(
                         response
                             .kind(InteractionResponseType::UpdateMessage)
                             .interaction_response_data(|data| {
-                                render_board(
-                                    &game_list.get(game_id).unwrap(),
-                                    data,
+                                if game_over {
+                                    let safes = game
+                                        .board
+                                        .as_ref()
+                                        .unwrap()
+                                        .iter()
+                                        .filter(|&c| matches!(c, MinesweeperCell::Safe))
+                                        .count();
+                                    let bombs = game.mines;
+
+                                    if safes == 0 {
+                                        data.content(format!(
+                                            "**You win!**\nBombs: {}\nTime: {}s",
+                                            bombs,
+                                            game.start_time.unwrap().elapsed().as_secs()
+                                        ));
+                                    } else {
+                                        data.content(format!(
+                                            "**Game over.**\nBombs: {}\nCleared: {}/{}\nTime: {}s",
+                                            bombs,
+                                            25 - safes - bombs,
+                                            25 - bombs,
+                                            game.start_time.unwrap().elapsed().as_secs()
+                                        ));
+                                    }
+                                }
+
+                                data.set_components(render_board(
+                                    game,
                                     String::from(game_id),
-                                    Some(index),
+                                    &Some(selected_cells),
                                     game_over,
-                                )
+                                ))
                             })
                     })
                     .await?;
