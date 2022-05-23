@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use rand::seq::SliceRandom;
 
-use serenity::builder::{CreateComponents, CreateInteractionResponseData};
+use serenity::builder::CreateComponents;
 use serenity::model::channel::ReactionType;
 use serenity::model::id::UserId;
 use serenity::model::interactions::{
@@ -15,7 +15,7 @@ use serenity::model::interactions::{
 };
 use serenity::prelude::*;
 
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::Error;
 
@@ -164,7 +164,7 @@ fn number_to_emoji(number: usize) -> String {
     String::from(str)
 }
 
-fn get_adjacent_cells(board: &Vec<MinesweeperCell>, index: usize) -> Vec<usize> {
+fn get_adjacent_indexes(index: usize) -> Vec<usize> {
     let mut cells = Vec::new();
 
     let iy = index / 5;
@@ -190,7 +190,7 @@ fn get_adjacent_cells(board: &Vec<MinesweeperCell>, index: usize) -> Vec<usize> 
 }
 
 fn count_adjacent_bombs(board: &Vec<MinesweeperCell>, index: usize) -> usize {
-    get_adjacent_cells(board, index)
+    get_adjacent_indexes(index)
         .iter()
         .filter(|&&c| matches!(board[c], MinesweeperCell::Bomb))
         .count()
@@ -200,7 +200,11 @@ fn zero_fill(board: &Vec<MinesweeperCell>, mut set: HashSet<usize>) -> HashSet<u
     let prev = set.clone();
     for s in prev.iter() {
         if count_adjacent_bombs(board, *s) == 0 {
-            set.extend(get_adjacent_cells(board, *s).iter());
+            set.extend(get_adjacent_indexes(*s).iter());
+            set = set
+                .into_iter()
+                .filter(|&c| !matches!(board[c], MinesweeperCell::Checked))
+                .collect();
         }
     }
     if prev == set {
