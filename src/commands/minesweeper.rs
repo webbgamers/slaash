@@ -92,7 +92,7 @@ fn render_board(
                             ),
                             MinesweeperCell::Safe => (
                                 if game_over {
-                                    number_to_emoji(count_adjacent_bombs(&board, index))
+                                    number_to_emoji(count_adjacent_bombs(board, index))
                                 } else {
                                     String::from("\u{1F7E6}")
                                 },
@@ -100,7 +100,7 @@ fn render_board(
                                 game_over,
                             ),
                             MinesweeperCell::Checked => (
-                                number_to_emoji(count_adjacent_bombs(&board, index)),
+                                number_to_emoji(count_adjacent_bombs(board, index)),
                                 ButtonStyle::Success,
                                 true,
                             ),
@@ -113,7 +113,7 @@ fn render_board(
                         }
 
                         if let Some(cells) = selected_cells {
-                            if let Some(_) = cells.iter().find(|&&c| c == index) {
+                            if cells.iter().any(|&c| c == index) {
                                 style = cell_style;
                             }
                         };
@@ -171,11 +171,11 @@ fn get_adjacent_indexes(index: usize) -> Vec<usize> {
     let ix = index % 5;
 
     for y in iy as isize - 1..iy as isize + 2 {
-        if y < 0 || y > 5 as isize - 1 {
+        if !(0..=5_isize - 1).contains(&y) {
             continue;
         }
         for x in ix as isize - 1..ix as isize + 2 {
-            if x < 0 || x > 5 as isize - 1 {
+            if !(0..=5_isize - 1).contains(&x) {
                 continue;
             }
             if x == ix as isize && y == iy as isize {
@@ -189,7 +189,7 @@ fn get_adjacent_indexes(index: usize) -> Vec<usize> {
     cells
 }
 
-fn count_adjacent_bombs(board: &Vec<MinesweeperCell>, index: usize) -> usize {
+fn count_adjacent_bombs(board: &[MinesweeperCell], index: usize) -> usize {
     get_adjacent_indexes(index)
         .iter()
         .filter(|&&c| matches!(board[c], MinesweeperCell::Bomb))
@@ -220,10 +220,9 @@ pub async fn minesweeper(
 ) -> Result<(), Error> {
     let mut bombs = 3;
     if let Some(option) = command.data.options.get(0) {
-        if let Some(value) = &option.resolved {
-            if let ApplicationCommandInteractionDataOptionValue::Integer(count) = value {
-                bombs = *count as usize;
-            }
+        if let Some(ApplicationCommandInteractionDataOptionValue::Integer(count)) = &option.resolved
+        {
+            bombs = *count as usize;
         }
     }
     let mut game_data = ctx.data.write().await;
@@ -239,7 +238,7 @@ pub async fn minesweeper(
                 .kind(InteractionResponseType::ChannelMessageWithSource)
                 .interaction_response_data(|response_data| {
                     response_data.set_components(render_board(
-                        &game_list.get(&command.id.to_string()).unwrap(),
+                        game_list.get(&command.id.to_string()).unwrap(),
                         command.id.to_string(),
                         &None,
                         false,
@@ -259,10 +258,10 @@ pub async fn minesweeper_button(
     split.next();
     let game_id = split
         .next()
-        .ok_or::<Error>("Missing game id in component custom id".into())?;
+        .ok_or("Missing game id in component custom id")?;
     let index = split
         .next()
-        .ok_or::<Error>("Missing cell index in component custom id".into())?
+        .ok_or("Missing cell index in component custom id")?
         .parse::<usize>()?;
 
     let mut game_data = ctx.data.write().await;
@@ -270,7 +269,7 @@ pub async fn minesweeper_button(
     match game_list.get_mut(game_id) {
         Some(game) => {
             if component.user.id == game.player {
-                if let None = game.board {
+                if game.board.is_none() {
                     game.start_game(index);
                 }
 
@@ -293,8 +292,7 @@ pub async fn minesweeper_button(
                             }
                             selected_cells = fill.into_iter().collect::<Vec<_>>();
 
-                            if let None = board.iter().find(|&c| matches!(c, MinesweeperCell::Safe))
-                            {
+                            if !board.iter().any(|c| matches!(c, MinesweeperCell::Safe)) {
                                 game_over = true;
                             }
                         }
