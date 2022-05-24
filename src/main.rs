@@ -10,7 +10,6 @@ use serenity::model::id::GuildId;
 use serenity::model::interactions::{
     application_command::ApplicationCommandInteraction,
     application_command::ApplicationCommandOptionType,
-    //message_component::MessageComponentInteraction,
     Interaction,
 };
 use serenity::prelude::*;
@@ -19,8 +18,9 @@ use serenity::Client;
 use tracing::{error, info};
 
 use crate::commands::error::*;
-use crate::commands::minesweeper::*;
 use crate::commands::ping::*;
+use crate::commands::minesweeper::*;
+use crate::commands::blackjack::*;
 
 pub struct ShardManagerContainer;
 
@@ -43,7 +43,8 @@ impl EventHandler for Handler {
                     "ping" => ping(ctx, command).await,
                     "error" => fail(ctx, command).await,
                     "minesweeper" => minesweeper(ctx, command).await,
-                    "bad" => bad(ctx, command).await,
+                    "blackjack" => blackjack(ctx, command).await,
+
 
                     _ => Err("Command not implemented".into()),
                 };
@@ -79,10 +80,11 @@ impl EventHandler for Handler {
                 .create_application_command(|command| {
                     command.name("ping").description("Pong hopefully.")
                 })
+
                 .create_application_command(|command| {
                     command
                         .name("minesweeper")
-                        .description("Play a game of minesweeper!")
+                        .description("Clear tiles until you win, but dont hit a mine!")
                         .create_option(|option| {
                             option
                                 .name("mines")
@@ -92,6 +94,13 @@ impl EventHandler for Handler {
                                 .max_int_value(23)
                         })
                 })
+
+                .create_application_command(|command| {
+                    command
+                        .name("blackjack")
+                        .description("Start a game of blackjack.")
+                })
+
                 .create_application_command(|command| {
                     command.name("error").description("Test error.")
                 })
@@ -104,15 +113,6 @@ impl EventHandler for Handler {
             new_commands.into_iter().map(|c| c.name).collect::<Vec<_>>()
         );
     }
-}
-
-async fn bad(ctx: Context, command: ApplicationCommandInteraction) -> Result<(), Error> {
-    command
-        .member
-        .unwrap()
-        .kick_with_reason(&ctx.http, "Test (hopefully doesnt ban)")
-        .await?;
-    Ok(())
 }
 
 #[tokio::main]
