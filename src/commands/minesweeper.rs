@@ -19,6 +19,14 @@ use tracing::warn;
 
 use crate::Error;
 
+/*
+    TODO:
+        - Flagging with command.message.reactions
+        - Get get player from command.message.interaction.user
+        - Store board as a Vec of Bomb/Safe
+        - Store game state as a Vec of Flagged/Checked/None
+ */
+
 pub enum MinesweeperCell {
     Safe,
     Checked,
