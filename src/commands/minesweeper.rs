@@ -327,13 +327,13 @@ pub async fn minesweeper_button(
 
                                     if safes == 0 {
                                         data.content(format!(
-                                            "**You win!**\nBombs: {}\nTime: {}s",
+                                            "**You win!**\nMines: {}\nTime: {}s",
                                             bombs,
                                             game.start_time.unwrap().elapsed().as_secs()
                                         ));
                                     } else {
                                         data.content(format!(
-                                            "**Game over.**\nBombs: {}\nCleared: {}/{}\nTime: {}s",
+                                            "**Game over.**\nMines: {}\nCleared: {}/{}\nTime: {}s",
                                             bombs,
                                             25 - safes - bombs,
                                             25 - bombs,

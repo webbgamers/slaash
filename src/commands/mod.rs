@@ -1,3 +1,5 @@
 pub mod error;
-pub mod minesweeper;
 pub mod ping;
+
+pub mod minesweeper;
+pub mod blackjack;
