@@ -7,7 +7,7 @@ use tracing::info;
 
 use crate::Error;
 
-pub async fn ping(ctx: Context, command: ApplicationCommandInteraction) -> Result<(), Error> {
+pub async fn ping(ctx: &Context, command: &ApplicationCommandInteraction) -> Result<(), Error> {
     command
         .create_interaction_response(&ctx.http, |response| {
             response
@@ -16,6 +16,9 @@ pub async fn ping(ctx: Context, command: ApplicationCommandInteraction) -> Resul
         })
         .await?;
 
-    info!("Ping from {}", command.member.unwrap().display_name());
+    info!(
+        "Ping from {}",
+        command.member.as_ref().unwrap().display_name()
+    );
     Ok(())
 }

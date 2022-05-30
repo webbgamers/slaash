@@ -15,17 +15,16 @@ use serenity::model::interactions::{
 };
 use serenity::prelude::*;
 
-use tracing::warn;
-
 use crate::Error;
 
 /*
-    TODO:
-        - Flagging with command.message.reactions
-        - Get get player from command.message.interaction.user
-        - Store board as a Vec of Bomb/Safe
-        - Store game state as a Vec of Flagged/Checked/None
- */
+   TODO:
+       - Flagging with command.message.reactions
+       - Get get player from command.message.interaction.user
+       - Store board as a Vec of Bomb/Safe
+       - Store game state as a Vec of Flagged/Checked/None
+       - Change game key from String to InteractionId
+*/
 
 pub enum MinesweeperCell {
     Safe,
@@ -179,11 +178,11 @@ fn get_adjacent_indexes(index: usize) -> Vec<usize> {
     let ix = index % 5;
 
     for y in iy as isize - 1..iy as isize + 2 {
-        if !(0..=5_isize - 1).contains(&y) {
+        if !(0..5_isize).contains(&y) {
             continue;
         }
         for x in ix as isize - 1..ix as isize + 2 {
-            if !(0..=5_isize - 1).contains(&x) {
+            if !(0..5_isize).contains(&x) {
                 continue;
             }
             if x == ix as isize && y == iy as isize {
@@ -223,8 +222,8 @@ fn zero_fill(board: &Vec<MinesweeperCell>, mut set: HashSet<usize>) -> HashSet<u
 }
 
 pub async fn minesweeper(
-    ctx: Context,
-    command: ApplicationCommandInteraction,
+    ctx: &Context,
+    command: &ApplicationCommandInteraction,
 ) -> Result<(), Error> {
     let mut bombs = 3;
     if let Some(option) = command.data.options.get(0) {
@@ -258,8 +257,8 @@ pub async fn minesweeper(
 }
 
 pub async fn minesweeper_button(
-    ctx: Context,
-    component: MessageComponentInteraction,
+    ctx: &Context,
+    component: &MessageComponentInteraction,
 ) -> Result<(), Error> {
     let component_id = component.data.custom_id.clone();
     let mut split = component_id.split('-');
@@ -305,7 +304,9 @@ pub async fn minesweeper_button(
                             }
                         }
                         MinesweeperCell::Checked => {
-                            warn!("Checked cell selected which should be disabled.");
+                            return Err(Error::from(
+                                "Checked cell selected which should be disabled.",
+                            ));
                         }
                     }
                 }
@@ -360,9 +361,10 @@ pub async fn minesweeper_button(
                         response
                             .kind(InteractionResponseType::ChannelMessageWithSource)
                             .interaction_response_data(|data| {
-                                data.ephemeral(true).content(
+                                data.content(
                                     "Thats not your game! Create your own with `/minesweeper`.",
                                 )
+                                .ephemeral(true)
                             })
                     })
                     .await?;

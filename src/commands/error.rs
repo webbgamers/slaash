@@ -3,9 +3,9 @@ use serenity::prelude::*;
 
 use crate::Error;
 
-pub async fn fail(_ctx: Context, command: ApplicationCommandInteraction) -> Result<(), Error> {
+pub async fn fail(_ctx: &Context, command: &ApplicationCommandInteraction) -> Result<(), Error> {
     Err(Error::from(format!(
         "Test error from {}",
-        command.member.unwrap().display_name()
+        command.member.as_ref().unwrap().display_name()
     )))
 }
