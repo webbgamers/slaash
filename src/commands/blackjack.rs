@@ -13,6 +13,34 @@ use tracing::info;
 
 use crate::Error;
 
+enum Suit {
+    Spades,
+    Clubs,
+    Hearts,
+    Diamonds
+}
+
+enum Number {
+    Ace,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King
+}
+
+struct Card {
+    suit: Suit,
+    number: Number
+}
+
 pub struct BlackjackGame {
     players: Vec<UserId>,
 }
